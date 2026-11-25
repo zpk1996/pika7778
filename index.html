@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="theme-color" content="#2A1E16" />
+  <meta name="theme-color" content="#241912" />
   <meta name="format-detection" content="telephone=no" />
   <title>明年依然好时节</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%232D2017'/%3E%3Ccircle cx='32' cy='32' r='16' fill='%23E8B979' fill-opacity='0.9'/%3E%3Cpath d='M29 25v14l11-7z' fill='%232D2017'/%3E%3C/svg%3E" />
@@ -11,9 +11,8 @@
   <!--
     ============================================================
     使用说明：
-    1. 换你自己的录音：把录音转成 MP3，命名为 song.mp3，直接覆盖同目录的 song.mp3 即可。
-    2. 改文案 / 歌名 / 落款：直接改底部 <script> 里的 LETTER_CONFIG 对象。
-    3. 本页仅依赖同目录的 cover.jpg 与 song.mp3，无任何外网资源请求，适合 GitHub Pages 永久托管。
+    1. 换录音：覆盖同目录下的 song-zpk.mp3 即可。
+    2. 换图片或改文案：直接编辑下方 <script> 里的 LETTER_CONFIG 对象。
     ============================================================
   -->
   <style>
@@ -22,7 +21,6 @@
       --wood-warm: #33241A;
       --gold-soft: #ECC389;
       --gold-warm: #D89E59;
-      --gold-glow: rgba(236, 195, 137, 0.28);
       --cream-text: #F9F2E7;
       --cream-sub: rgba(249, 242, 231, 0.72);
       --cream-muted: rgba(249, 242, 231, 0.48);
@@ -60,27 +58,32 @@
       -webkit-tap-highlight-color: transparent;
     }
 
-    /* 桌面大屏时的柔焦晚霞氛围底景，告别生硬黑边 */
+    body.lightbox-open {
+      overflow: hidden;
+    }
+
+    /* 桌面大屏柔焦氛围底景 */
     .desktop-backdrop {
       position: fixed;
       inset: -40px;
       background-image: url('./cover.jpg');
       background-size: cover;
-      background-position: center 35%;
-      filter: blur(42px) saturate(1.1) brightness(0.45);
+      background-position: center 45%;
+      filter: blur(42px) saturate(1.08) brightness(0.42);
       transform: scale(1.12);
       z-index: 0;
       pointer-events: none;
+      transition: background-image 0.7s ease;
     }
 
     .desktop-backdrop::after {
       content: "";
       position: absolute;
       inset: 0;
-      background: radial-gradient(circle at 50% 25%, rgba(62, 42, 28, 0.32), rgba(24, 16, 11, 0.84));
+      background: radial-gradient(circle at 50% 25%, rgba(62, 42, 28, 0.34), rgba(24, 16, 11, 0.86));
     }
 
-    /* 主画卷容器（手机全宽铺满，桌面端呈现精致绘本明信片比例） */
+    /* 主画卷容器 */
     .storybook {
       position: relative;
       z-index: 1;
@@ -94,132 +97,227 @@
     }
 
     /* ============================================================
-       顶部沉浸式手绘水彩插画舞台（日落窗台、桂花雏菊、手写信与热茶）
+       顶部 4 图自动滑动轮播舞台（每 3 秒平滑切换，轻点放大看）
        ============================================================ */
-    .hero-scene {
+    .hero-carousel {
       position: relative;
       width: 100%;
-      aspect-ratio: 3 / 3.72;
+      aspect-ratio: 3 / 3.45;
       overflow: hidden;
-      background-color: #3A291E;
-      cursor: pointer;
-      touch-action: manipulation;
+      background-color: #211711;
+      user-select: none;
+      touch-action: pan-y;
     }
 
-    .hero-artwork {
+    .carousel-track {
+      display: flex;
       width: 100%;
       height: 100%;
-      object-fit: cover;
-      object-position: center 62%;
-      display: block;
-      transform: scale(1.01);
-      transition: transform 2.4s cubic-bezier(0.22, 1, 0.36, 1), filter 1.4s ease;
+      transform: translate3d(0, 0, 0);
+      transition: transform 0.68s cubic-bezier(0.25, 0.82, 0.25, 1);
       will-change: transform;
     }
 
-    body.is-playing .hero-artwork {
-      animation: gentleBreathe 26s ease-in-out infinite alternate;
-      filter: saturate(1.06) brightness(1.03);
+    .carousel-track.is-dragging {
+      transition: none;
+    }
+
+    .carousel-slide {
+      position: relative;
+      flex: 0 0 100%;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      cursor: zoom-in;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* 九宫格等完整展示图的柔焦氛围衬底 */
+    .slide-blur-bg {
+      position: absolute;
+      inset: -16px;
+      background-size: cover;
+      background-position: center;
+      filter: blur(22px) brightness(0.42) saturate(1.1);
+      transform: scale(1.08);
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    .slide-img {
+      position: relative;
+      z-index: 1;
+      display: block;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    /* 封面照片满幅沉浸展示 */
+    .carousel-slide.mode-cover .slide-img {
+      object-fit: cover;
+      object-position: center 62%;
+      transition: transform 2.4s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    body.is-playing .carousel-slide.mode-cover.is-active .slide-img {
+      animation: gentleBreathe 24s ease-in-out infinite alternate;
     }
 
     @keyframes gentleBreathe {
       0% { transform: scale(1.01) translate3d(0, 0, 0); }
-      100% { transform: scale(1.075) translate3d(0, -1.4%, 0); }
+      100% { transform: scale(1.065) translate3d(0, -1.2%, 0); }
     }
 
-    /* 夕阳微尘光点 Canvas 层 */
+    /* 九宫格文字图完整无裁切展示 */
+    .carousel-slide.mode-contain {
+      padding: max(46px, calc(env(safe-area-inset-top) + 36px)) 16px 46px;
+    }
+
+    .carousel-slide.mode-contain .slide-img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      border-radius: 10px;
+      filter: drop-shadow(0 12px 28px rgba(0, 0, 0, 0.45));
+    }
+
+    /* 夕阳微尘光点（仅封面柔亮，看文字图时自动变极淡） */
     .sunbeam-canvas {
       position: absolute;
       inset: 0;
       width: 100%;
       height: 100%;
       pointer-events: none;
-      z-index: 2;
+      z-index: 3;
+      transition: opacity 0.6s ease;
     }
 
-    /* 插画顶部极柔和暖晕（适配手机状态栏） */
-    .hero-scene::before {
-      content: "";
+    .hero-carousel.is-text-slide .sunbeam-canvas {
+      opacity: 0.22;
+    }
+
+    /* 顶部/底部极轻微渐晕，让浮层标签清晰不刺眼 */
+    .carousel-top-shade {
       position: absolute;
       top: 0;
       left: 0;
       right: 0;
       height: 76px;
-      background: linear-gradient(180deg, rgba(46, 30, 19, 0.36) 0%, rgba(46, 30, 19, 0) 100%);
+      background: linear-gradient(180deg, rgba(28, 19, 13, 0.46) 0%, rgba(28, 19, 13, 0) 100%);
       pointer-events: none;
-      z-index: 3;
+      z-index: 4;
     }
 
-    /* 插画底部与胡桃木背景的无缝柔焦羽化融合 */
-    .hero-fade {
+    .carousel-bottom-shade {
       position: absolute;
       left: 0;
       right: 0;
-      bottom: -2px;
-      height: 40%;
-      background: linear-gradient(
-        180deg,
-        rgba(36, 25, 18, 0) 0%,
-        rgba(36, 25, 18, 0.24) 40%,
-        rgba(36, 25, 18, 0.82) 78%,
-        #241912 100%
-      );
+      bottom: 0;
+      height: 68px;
+      background: linear-gradient(180deg, rgba(36, 25, 18, 0) 0%, rgba(36, 25, 18, 0.72) 72%, #241912 100%);
       pointer-events: none;
-      z-index: 3;
+      z-index: 4;
     }
 
-    /* 画面左上角极轻的温柔提示胶囊（未播放时轻柔浮现，播放后自然隐去） */
-    .hero-pill {
+    /* 左上角轻胶囊：显示当前图序与图题 */
+    .slide-badge {
       position: absolute;
-      top: max(18px, calc(env(safe-area-inset-top) + 12px));
-      left: 18px;
-      z-index: 4;
+      top: max(14px, calc(env(safe-area-inset-top) + 10px));
+      left: 16px;
+      z-index: 5;
       display: inline-flex;
       align-items: center;
       gap: 7px;
-      padding: 6px 13px;
+      padding: 5px 12px;
       border-radius: 999px;
-      background: rgba(42, 29, 20, 0.42);
+      background: rgba(34, 24, 17, 0.56);
       backdrop-filter: blur(8px);
       -webkit-backdrop-filter: blur(8px);
-      border: 1px solid rgba(255, 243, 224, 0.24);
+      border: 1px solid rgba(255, 243, 224, 0.2);
       color: #FFF8EE;
       font-family: var(--sans);
       font-size: 11.5px;
-      letter-spacing: 0.08em;
+      letter-spacing: 0.06em;
       pointer-events: none;
-      transition: opacity 0.6s ease, transform 0.6s ease;
     }
 
-    .hero-pill-dot {
-      width: 6px;
-      height: 6px;
+    .slide-badge-dot {
+      width: 5.5px;
+      height: 5.5px;
       border-radius: 50%;
       background: var(--gold-soft);
-      box-shadow: 0 0 8px rgba(236, 195, 137, 0.9);
-      animation: pulseDot 2.2s ease-in-out infinite;
     }
 
-    @keyframes pulseDot {
-      0%, 100% { opacity: 0.5; transform: scale(0.9); }
-      50% { opacity: 1; transform: scale(1.25); }
+    /* 右上角轻提示：轻点放大 */
+    .zoom-hint-pill {
+      position: absolute;
+      top: max(14px, calc(env(safe-area-inset-top) + 10px));
+      right: 16px;
+      z-index: 5;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 11px;
+      border-radius: 999px;
+      background: rgba(34, 24, 17, 0.52);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 243, 224, 0.18);
+      color: rgba(255, 248, 238, 0.88);
+      font-family: var(--sans);
+      font-size: 11px;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      touch-action: manipulation;
     }
 
-    body.is-playing .hero-pill {
-      opacity: 0;
-      transform: translateY(-4px);
+    /* 底部 4 颗轮播指示点 */
+    .carousel-dots {
+      position: absolute;
+      left: 50%;
+      bottom: 12px;
+      transform: translateX(-50%);
+      z-index: 5;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(28, 19, 13, 0.42);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+    }
+
+    .dot-btn {
+      width: 7px;
+      height: 7px;
+      padding: 0;
+      border: none;
+      border-radius: 999px;
+      background: rgba(249, 242, 231, 0.36);
+      cursor: pointer;
+      touch-action: manipulation;
+      transition: width 0.32s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.32s ease;
+    }
+
+    .dot-btn.is-active {
+      width: 20px;
+      background: var(--gold-soft);
     }
 
     /* ============================================================
-       温润琥珀播放器（自然衔接在插画木窗台下沿）
+       温润琥珀播放器（清晰独立，不遮挡九宫格底部内容）
        ============================================================ */
     .player-section {
       position: relative;
       z-index: 5;
-      margin: -34px 20px 24px;
+      margin: 12px 20px 22px;
       padding: 18px 18px 14px;
       border-radius: 20px;
-      background: rgba(49, 35, 25, 0.72);
+      background: rgba(49, 35, 25, 0.78);
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
       border: 1px solid rgba(244, 217, 178, 0.16);
@@ -261,7 +359,8 @@
 
     .play-orb:focus-visible,
     .mini-action:focus-visible,
-    .scrub-zone:focus-visible {
+    .scrub-zone:focus-visible,
+    .lb-btn:focus-visible {
       outline: 2px solid var(--gold-soft);
       outline-offset: 3px;
     }
@@ -314,7 +413,6 @@
       text-overflow: ellipsis;
     }
 
-    /* 暖金琴弦声波 */
     .wave-bars {
       flex-shrink: 0;
       display: flex;
@@ -348,7 +446,6 @@
       50% { height: 18px; }
     }
 
-    /* 进度条 */
     .scrub-zone {
       position: relative;
       width: 100%;
@@ -445,7 +542,7 @@
     }
 
     /* ============================================================
-       拆开的手工暖米信笺（呼应窗台画里的那封信）
+       暖米手写信笺
        ============================================================ */
     .letter-wrap {
       padding: 0 20px;
@@ -463,7 +560,6 @@
       overflow: hidden;
     }
 
-    /* 细腻温暖信纸肌理 */
     .letter-paper::before {
       content: "";
       position: absolute;
@@ -473,7 +569,6 @@
       background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23p)' opacity='0.22'/%3E%3C/svg%3E");
     }
 
-    /* 右上角一枝极轻的金色桂花/银杏叶脉水印，呼应窗台插画 */
     .leaf-watermark {
       position: absolute;
       top: 14px;
@@ -559,6 +654,109 @@
       color: var(--paper-ink-soft);
     }
 
+    /* ============================================================
+       全屏高清放大看图灯箱（支持双指缩放、双击放大、拖拽、左右切换）
+       ============================================================ */
+    .lightbox {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      background: rgba(12, 9, 7, 0.96);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      display: flex;
+      flex-direction: column;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.28s ease;
+      touch-action: none;
+    }
+
+    .lightbox.is-open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .lb-header {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: max(14px, env(safe-area-inset-top)) 16px 10px;
+      z-index: 4;
+    }
+
+    .lb-title {
+      font-family: var(--sans);
+      font-size: 13.5px;
+      color: var(--cream-text);
+      letter-spacing: 0.06em;
+    }
+
+    .lb-btn {
+      width: 44px;
+      height: 44px;
+      border: 1px solid rgba(255, 244, 228, 0.16);
+      border-radius: 50%;
+      background: rgba(42, 31, 23, 0.72);
+      color: var(--cream-text);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      touch-action: manipulation;
+      transition: background-color 0.2s ease, transform 0.18s ease;
+    }
+
+    .lb-btn:active {
+      transform: scale(0.92);
+    }
+
+    .lb-stage {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 12px;
+      touch-action: none;
+    }
+
+    .lb-img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      border-radius: 6px;
+      transform-origin: center center;
+      will-change: transform;
+      user-select: none;
+      -webkit-user-drag: none;
+    }
+
+    .lb-img.is-smooth {
+      transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .lb-footer {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 20px max(18px, calc(env(safe-area-inset-bottom) + 12px));
+      gap: 12px;
+      z-index: 4;
+    }
+
+    .lb-hint {
+      flex: 1;
+      text-align: center;
+      font-family: var(--sans);
+      font-size: 11.5px;
+      color: var(--cream-muted);
+      letter-spacing: 0.04em;
+    }
+
     /* 底部轻提示 */
     .toast {
       position: fixed;
@@ -575,7 +773,7 @@
       letter-spacing: 0.05em;
       opacity: 0;
       pointer-events: none;
-      z-index: 20;
+      z-index: 120;
       transition: opacity 0.25s ease, transform 0.25s ease;
     }
 
@@ -597,8 +795,7 @@
     }
 
     @media (prefers-reduced-motion: reduce) {
-      body.is-playing .hero-artwork,
-      .hero-pill-dot,
+      body.is-playing .carousel-slide.mode-cover.is-active .slide-img,
       body.is-playing .wave-bars span {
         animation: none;
       }
@@ -606,19 +803,31 @@
   </style>
 </head>
 <body>
-  <div class="desktop-backdrop" aria-hidden="true"></div>
+  <div class="desktop-backdrop" id="desktopBackdrop" aria-hidden="true"></div>
 
   <main class="storybook">
-    <!-- 温馨夕阳窗台手绘插画舞台（轻点画面任意处也可播放/暂停） -->
-    <section class="hero-scene" id="heroScene" aria-label="落日窗台插画，轻触可播放或暂停">
-      <img class="hero-artwork" src="./cover.jpg" alt="秋日傍晚的温暖窗台，纱帘轻拂，窗台上有雏菊桂花、一杯热茶和一封系着麻绳的手写信" />
+    <!-- 顶部 4 图自动滑动轮播舞台（每 3 秒自动滑动，点击任意张可全屏放大） -->
+    <section class="hero-carousel" id="heroCarousel" aria-label="相册轮播，轻点图片可放大查看">
+      <div class="carousel-track" id="carouselTrack"></div>
       <canvas class="sunbeam-canvas" id="sunbeamCanvas" aria-hidden="true"></canvas>
-      <div class="hero-fade" aria-hidden="true"></div>
+      <div class="carousel-top-shade" aria-hidden="true"></div>
+      <div class="carousel-bottom-shade" aria-hidden="true"></div>
 
-      <div class="hero-pill" aria-hidden="true">
-        <span class="hero-pill-dot"></span>
-        <span>轻触播放这首歌</span>
+      <div class="slide-badge" id="slideBadge" aria-live="polite">
+        <span class="slide-badge-dot"></span>
+        <span id="slideBadgeText">1 / 4</span>
       </div>
+
+      <button class="zoom-hint-pill" id="zoomBtn" type="button" aria-label="放大查看当前图片">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="11" cy="11" r="7"/>
+          <path d="M21 21l-4.3-4.3"/>
+          <path d="M11 8v6M8 11h6"/>
+        </svg>
+        <span>点击放大</span>
+      </button>
+
+      <div class="carousel-dots" id="carouselDots" role="tablist" aria-label="切换图片"></div>
     </section>
 
     <!-- 温润琥珀留声播放器 -->
@@ -668,10 +877,9 @@
       </div>
     </section>
 
-    <!-- 摊开在木桌上的暖米手写信笺 -->
+    <!-- 暖米手写信笺 -->
     <section class="letter-wrap" aria-label="信笺寄语">
       <article class="letter-paper">
-        <!-- 精致银杏叶水印 -->
         <svg class="leaf-watermark" viewBox="0 0 64 64" fill="none" aria-hidden="true">
           <path d="M31 56 C31 46 31.5 39 32 34" stroke="#9A7245" stroke-width="1.35" stroke-linecap="round"/>
           <path d="M32 34 C19 33 10 25 11 16 C16 12 24 14 29 19 C30.8 20.8 31.4 22.8 32 25 C32.6 22.8 33.4 20.6 35.4 18.8 C41 13.8 49 12.2 53 16.5 C54 25.5 45 33.2 32 34 Z" fill="#D89E59" fill-opacity="0.24" stroke="#9A7245" stroke-width="1.15" stroke-linejoin="round"/>
@@ -694,25 +902,62 @@
     </section>
   </main>
 
+  <!-- 全屏高清放大看图灯箱 -->
+  <div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="放大查看图片">
+    <div class="lb-header">
+      <span class="lb-title" id="lbTitle">1 / 4</span>
+      <button class="lb-btn" id="lbClose" type="button" aria-label="关闭大图">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <path d="M18 6L6 18M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="lb-stage" id="lbStage">
+      <img class="lb-img" id="lbImg" src="" alt="放大预览图片" />
+    </div>
+
+    <div class="lb-footer">
+      <button class="lb-btn" id="lbPrev" type="button" aria-label="上一张">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M15 18l-6-6 6-6"/>
+        </svg>
+      </button>
+      <span class="lb-hint" id="lbHint">双击或双指放大查看细节 · 左右切换</span>
+      <button class="lb-btn" id="lbNext" type="button" aria-label="下一张">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 18l6-6-6-6"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <audio id="audio" preload="metadata" playsinline></audio>
 
   <script>
     /* ============================================================
-       个性化文案配置区（之后想改文字、落款、副标题，只改这里）
+       个性化文案与相册配置区（后续想改图片顺序、文字、落款，只改这里）
        ============================================================ */
     const LETTER_CONFIG = {
       pageTitle: '明年依然好时节',
       songTitle: '明年依然好时节',
-      songSubtitle: '许飞 · 愿你听时风轻云暖',
-      audioSrc: './song.mp3',
+      songSubtitle: '翻唱给你听 · 愿你听时风轻云暖',
+      audioSrc: './song-zpk.mp3',
+      slideIntervalMs: 3000,
+      slides: [
+        { src: './cover.jpg', label: '留念', mode: 'cover' },
+        { src: './photo-2.jpg', label: '我们如何看待对方', mode: 'contain' },
+        { src: './photo-3.jpg', label: '我看你', mode: 'contain' },
+        { src: './photo-4.jpg', label: '你看我', mode: 'contain' }
+      ],
       letterGreeting: '见字如晤：',
       letterParagraphs: [
         '有些话当面说总怕显得太重，\n就写进纸里，再把这首歌留在这里。',
         '谢谢你陪我走过那样明朗的一程。\n往后哪怕不再一起玩了，\n也希望你迎面的风都是轻的，\n遇到的日子都温热明亮。',
         '不必回复，也不用有任何负担。\n愿你岁岁平安，明年依然好时节。'
       ],
-      letterPs: '附：这首歌随时都可以再听',
+      letterPs: '附：上方照片可滑动或点开放大细看',
       signName: '写信的人',
       signDate: '二零二六'
     };
@@ -735,8 +980,358 @@
         bodyEl.appendChild(p);
       });
 
+      const toastEl = $('toast');
+      let toastTimer = null;
+      function showToast(msg) {
+        toastEl.textContent = msg;
+        toastEl.classList.add('is-show');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => toastEl.classList.remove('is-show'), 1800);
+      }
+
+      /* ============================================================
+         1. 顶部 4 图自动滑动轮播（每 3 秒自动滑 + 手指滑动 + 点图放大）
+         ============================================================ */
+      const slides = LETTER_CONFIG.slides;
+      const heroCarousel = $('heroCarousel');
+      const carouselTrack = $('carouselTrack');
+      const carouselDots = $('carouselDots');
+      const slideBadgeText = $('slideBadgeText');
+      const desktopBackdrop = $('desktopBackdrop');
+      const zoomBtn = $('zoomBtn');
+
+      let currentSlide = 0;
+      let autoSlideTimer = null;
+      let isLightboxOpen = false;
+
+      // 渲染 4 张轮播项与指示点
+      slides.forEach((item, idx) => {
+        const slideEl = document.createElement('div');
+        slideEl.className = `carousel-slide mode-${item.mode}` + (idx === 0 ? ' is-active' : '');
+        slideEl.dataset.index = String(idx);
+
+        if (item.mode === 'contain') {
+          const blurBg = document.createElement('div');
+          blurBg.className = 'slide-blur-bg';
+          blurBg.style.backgroundImage = `url('${item.src}')`;
+          slideEl.appendChild(blurBg);
+        }
+
+        const img = document.createElement('img');
+        img.className = 'slide-img';
+        img.src = item.src;
+        img.alt = item.label || `回忆照片 ${idx + 1}`;
+        img.decoding = 'async';
+        img.loading = idx === 0 ? 'eager' : 'eager';
+        slideEl.appendChild(img);
+
+        carouselTrack.appendChild(slideEl);
+
+        const dot = document.createElement('button');
+        dot.type = 'button';
+        dot.className = 'dot-btn' + (idx === 0 ? ' is-active' : '');
+        dot.setAttribute('aria-label', `查看第 ${idx + 1} 张：${item.label}`);
+        dot.addEventListener('click', (e) => {
+          e.stopPropagation();
+          goToSlide(idx, true);
+        });
+        carouselDots.appendChild(dot);
+      });
+
+      const slideEls = Array.from(carouselTrack.children);
+      const dotEls = Array.from(carouselDots.children);
+
+      function goToSlide(index, resetTimer) {
+        currentSlide = (index + slides.length) % slides.length;
+        carouselTrack.classList.remove('is-dragging');
+        carouselTrack.style.transform = `translate3d(-${currentSlide * 100}%, 0, 0)`;
+
+        slideEls.forEach((el, i) => el.classList.toggle('is-active', i === currentSlide));
+        dotEls.forEach((el, i) => el.classList.toggle('is-active', i === currentSlide));
+
+        const info = slides[currentSlide];
+        slideBadgeText.textContent = info.label
+          ? `${currentSlide + 1} / ${slides.length} · ${info.label}`
+          : `${currentSlide + 1} / ${slides.length}`;
+
+        heroCarousel.classList.toggle('is-text-slide', info.mode === 'contain');
+        desktopBackdrop.style.backgroundImage = `url('${info.src}')`;
+
+        if (resetTimer) restartAutoSlide();
+      }
+
+      function stopAutoSlide() {
+        if (autoSlideTimer) {
+          clearInterval(autoSlideTimer);
+          autoSlideTimer = null;
+        }
+      }
+
+      function restartAutoSlide() {
+        stopAutoSlide();
+        if (isLightboxOpen || slides.length <= 1) return;
+        autoSlideTimer = setInterval(() => {
+          goToSlide(currentSlide + 1, false);
+        }, LETTER_CONFIG.slideIntervalMs);
+      }
+
+      goToSlide(0, true);
+
+      // 轮播触摸/鼠标左右滑动 + 轻点打开放大灯箱
+      let swipeStartX = 0;
+      let swipeStartY = 0;
+      let swipeDeltaX = 0;
+      let isSwiping = false;
+      let pointerActive = false;
+
+      heroCarousel.addEventListener('pointerdown', (e) => {
+        if (e.target.closest('.carousel-dots') || e.target.closest('.zoom-hint-pill')) return;
+        pointerActive = true;
+        isSwiping = false;
+        swipeStartX = e.clientX;
+        swipeStartY = e.clientY;
+        swipeDeltaX = 0;
+        stopAutoSlide();
+      });
+
+      heroCarousel.addEventListener('pointermove', (e) => {
+        if (!pointerActive) return;
+        const dx = e.clientX - swipeStartX;
+        const dy = e.clientY - swipeStartY;
+        if (!isSwiping && Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) {
+          isSwiping = true;
+          carouselTrack.classList.add('is-dragging');
+        }
+        if (isSwiping) {
+          swipeDeltaX = dx;
+          const width = heroCarousel.clientWidth || 360;
+          const basePct = -currentSlide * 100;
+          const deltaPct = (dx / width) * 100;
+          carouselTrack.style.transform = `translate3d(${basePct + deltaPct}%, 0, 0)`;
+        }
+      });
+
+      function finishHeroPointer() {
+        if (!pointerActive) return;
+        pointerActive = false;
+        if (isSwiping) {
+          const threshold = Math.min(60, (heroCarousel.clientWidth || 360) * 0.16);
+          if (swipeDeltaX < -threshold) {
+            goToSlide(currentSlide + 1, true);
+          } else if (swipeDeltaX > threshold) {
+            goToSlide(currentSlide - 1, true);
+          } else {
+            goToSlide(currentSlide, true);
+          }
+        } else {
+          // 轻点图片 -> 全屏放大查看当前张
+          openLightbox(currentSlide);
+        }
+        isSwiping = false;
+      }
+
+      heroCarousel.addEventListener('pointerup', finishHeroPointer);
+      heroCarousel.addEventListener('pointercancel', () => {
+        if (!pointerActive) return;
+        pointerActive = false;
+        isSwiping = false;
+        goToSlide(currentSlide, true);
+      });
+
+      zoomBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openLightbox(currentSlide);
+      });
+
+      /* ============================================================
+         2. 全屏高清放大看图灯箱（双击放大 / 双指捏合缩放 / 拖动 / 左右切换）
+         ============================================================ */
+      const lightbox = $('lightbox');
+      const lbTitle = $('lbTitle');
+      const lbImg = $('lbImg');
+      const lbStage = $('lbStage');
+      const lbClose = $('lbClose');
+      const lbPrev = $('lbPrev');
+      const lbNext = $('lbNext');
+
+      let lbIndex = 0;
+      let scale = 1;
+      let tx = 0;
+      let ty = 0;
+
+      function applyLbTransform(smooth) {
+        lbImg.classList.toggle('is-smooth', !!smooth);
+        lbImg.style.transform = `translate3d(${tx}px, ${ty}px, 0) scale(${scale})`;
+      }
+
+      function clampTranslation() {
+        if (scale <= 1) {
+          tx = 0;
+          ty = 0;
+          return;
+        }
+        const rect = lbStage.getBoundingClientRect();
+        const maxX = (rect.width * (scale - 1)) / 2 + 40;
+        const maxY = (rect.height * (scale - 1)) / 2 + 40;
+        tx = Math.max(-maxX, Math.min(maxX, tx));
+        ty = Math.max(-maxY, Math.min(maxY, ty));
+      }
+
+      function renderLightboxSlide(idx) {
+        lbIndex = (idx + slides.length) % slides.length;
+        const item = slides[lbIndex];
+        scale = 1;
+        tx = 0;
+        ty = 0;
+        applyLbTransform(false);
+        lbImg.src = item.src;
+        lbImg.alt = item.label || `第 ${lbIndex + 1} 张`;
+        lbTitle.textContent = item.label
+          ? `${lbIndex + 1} / ${slides.length} · ${item.label}`
+          : `${lbIndex + 1} / ${slides.length}`;
+      }
+
+      function openLightbox(idx) {
+        isLightboxOpen = true;
+        stopAutoSlide();
+        renderLightboxSlide(idx);
+        lightbox.classList.add('is-open');
+        document.body.classList.add('lightbox-open');
+      }
+
+      function closeLightbox() {
+        isLightboxOpen = false;
+        lightbox.classList.remove('is-open');
+        document.body.classList.remove('lightbox-open');
+        goToSlide(lbIndex, true);
+      }
+
+      lbClose.addEventListener('click', closeLightbox);
+      lbPrev.addEventListener('click', () => renderLightboxSlide(lbIndex - 1));
+      lbNext.addEventListener('click', () => renderLightboxSlide(lbIndex + 1));
+
+      document.addEventListener('keydown', (e) => {
+        if (!isLightboxOpen) return;
+        if (e.key === 'Escape') closeLightbox();
+        if (e.key === 'ArrowLeft') renderLightboxSlide(lbIndex - 1);
+        if (e.key === 'ArrowRight') renderLightboxSlide(lbIndex + 1);
+      });
+
+      // 支持双指捏合缩放 + 单指拖拽 + 双击放大 + 未放大时左右滑动切换
+      const activePointers = new Map();
+      let pinchStartDist = 0;
+      let pinchStartScale = 1;
+      let dragStartX = 0;
+      let dragStartY = 0;
+      let startTx = 0;
+      let startTy = 0;
+      let lastTapTime = 0;
+      let singleMoved = false;
+
+      function getPointerDist() {
+        const pts = Array.from(activePointers.values());
+        if (pts.length < 2) return 0;
+        const dx = pts[0].x - pts[1].x;
+        const dy = pts[0].y - pts[1].y;
+        return Math.hypot(dx, dy);
+      }
+
+      lbStage.addEventListener('pointerdown', (e) => {
+        lbStage.setPointerCapture && lbStage.setPointerCapture(e.pointerId);
+        activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (activePointers.size === 1) {
+          dragStartX = e.clientX;
+          dragStartY = e.clientY;
+          startTx = tx;
+          startTy = ty;
+          singleMoved = false;
+        } else if (activePointers.size === 2) {
+          pinchStartDist = getPointerDist();
+          pinchStartScale = scale;
+          singleMoved = true;
+        }
+      });
+
+      lbStage.addEventListener('pointermove', (e) => {
+        if (!activePointers.has(e.pointerId)) return;
+        activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+        if (activePointers.size === 2 && pinchStartDist > 0) {
+          const dist = getPointerDist();
+          scale = Math.max(1, Math.min(4, pinchStartScale * (dist / pinchStartDist)));
+          clampTranslation();
+          applyLbTransform(false);
+        } else if (activePointers.size === 1) {
+          const dx = e.clientX - dragStartX;
+          const dy = e.clientY - dragStartY;
+          if (Math.hypot(dx, dy) > 8) singleMoved = true;
+          if (scale > 1.02) {
+            tx = startTx + dx;
+            ty = startTy + dy;
+            clampTranslation();
+            applyLbTransform(false);
+          }
+        }
+      });
+
+      function onLbPointerUp(e) {
+        if (!activePointers.has(e.pointerId)) return;
+        const dx = e.clientX - dragStartX;
+        const dy = e.clientY - dragStartY;
+        const wasSingle = activePointers.size === 1;
+        activePointers.delete(e.pointerId);
+
+        if (activePointers.size === 0 && wasSingle) {
+          if (!singleMoved) {
+            const now = Date.now();
+            if (now - lastTapTime < 280) {
+              // 双击放大或还原
+              if (scale > 1.2) {
+                scale = 1;
+                tx = 0;
+                ty = 0;
+              } else {
+                scale = 2.3;
+                const rect = lbStage.getBoundingClientRect();
+                tx = (rect.left + rect.width / 2 - e.clientX) * 0.9;
+                ty = (rect.top + rect.height / 2 - e.clientY) * 0.9;
+                clampTranslation();
+              }
+              applyLbTransform(true);
+              lastTapTime = 0;
+            } else {
+              lastTapTime = now;
+              // 单击空白背景区域关闭灯箱
+              if (e.target === lbStage && scale <= 1.02) {
+                setTimeout(() => {
+                  if (lastTapTime === now && isLightboxOpen) closeLightbox();
+                }, 290);
+              }
+            }
+          } else if (scale <= 1.02 && Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy)) {
+            if (dx < 0) renderLightboxSlide(lbIndex + 1);
+            else renderLightboxSlide(lbIndex - 1);
+          }
+        }
+      }
+
+      lbStage.addEventListener('pointerup', onLbPointerUp);
+      lbStage.addEventListener('pointercancel', (e) => activePointers.delete(e.pointerId));
+
+      // 桌面端滚轮微调缩放
+      lbStage.addEventListener('wheel', (e) => {
+        if (!isLightboxOpen) return;
+        e.preventDefault();
+        const delta = e.deltaY < 0 ? 0.25 : -0.25;
+        scale = Math.max(1, Math.min(4, scale + delta));
+        clampTranslation();
+        applyLbTransform(true);
+      }, { passive: false });
+
+      /* ============================================================
+         3. 音频播放器（明年依然好时节_zpk.mp3）
+         ============================================================ */
       const audio = $('audio');
-      const heroScene = $('heroScene');
       const playBtn = $('playBtn');
       const replayBtn = $('replayBtn');
       const loopBtn = $('loopBtn');
@@ -745,17 +1340,8 @@
       const scrubDot = $('scrubDot');
       const currentTimeEl = $('currentTime');
       const totalTimeEl = $('totalTime');
-      const toastEl = $('toast');
 
-      let isDragging = false;
-      let toastTimer = null;
-
-      function showToast(msg) {
-        toastEl.textContent = msg;
-        toastEl.classList.add('is-show');
-        clearTimeout(toastTimer);
-        toastTimer = setTimeout(() => toastEl.classList.remove('is-show'), 1800);
-      }
+      let isDraggingScrub = false;
 
       function formatTime(sec) {
         if (!Number.isFinite(sec) || sec < 0) return '00:00';
@@ -796,11 +1382,11 @@
       });
       audio.addEventListener('error', () => {
         setPlaying(false);
-        showToast('音频加载失败，请确认 song.mp3 在同目录');
+        showToast('音频加载失败，请检查网络连接');
       });
 
       audio.addEventListener('timeupdate', () => {
-        if (isDragging) return;
+        if (isDraggingScrub) return;
         currentTimeEl.textContent = formatTime(audio.currentTime);
         if (Number.isFinite(audio.duration) && audio.duration > 0) {
           paintProgress(audio.currentTime / audio.duration);
@@ -822,7 +1408,6 @@
       }
 
       playBtn.addEventListener('click', togglePlay);
-      heroScene.addEventListener('click', togglePlay);
 
       replayBtn.addEventListener('click', async () => {
         audio.currentTime = 0;
@@ -861,19 +1446,19 @@
       }
 
       scrubZone.addEventListener('pointerdown', (e) => {
-        isDragging = true;
+        isDraggingScrub = true;
         scrubZone.classList.add('is-dragging');
         if (scrubZone.setPointerCapture) scrubZone.setPointerCapture(e.pointerId);
         applyScrub(e.clientX, false);
       });
 
       scrubZone.addEventListener('pointermove', (e) => {
-        if (isDragging) applyScrub(e.clientX, false);
+        if (isDraggingScrub) applyScrub(e.clientX, false);
       });
 
       function endScrub(e) {
-        if (!isDragging) return;
-        isDragging = false;
+        if (!isDraggingScrub) return;
+        isDraggingScrub = false;
         scrubZone.classList.remove('is-dragging');
         applyScrub(e.clientX, true);
       }
@@ -890,13 +1475,13 @@
       if ('mediaSession' in navigator) {
         navigator.mediaSession.metadata = new MediaMetadata({
           title: LETTER_CONFIG.songTitle,
-          artist: '许飞',
+          artist: '翻唱给你听',
           album: '留声信笺'
         });
       }
 
       /* ============================================================
-         温暖夕阳浮尘微光动画（Canvas 轻量绘制，尊重系统减弱动效设置）
+         4. 温暖夕阳微尘光点动画
          ============================================================ */
       const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       const canvas = $('sunbeamCanvas');
@@ -904,20 +1489,20 @@
 
       if (!reduceMotion && ctx) {
         let w = 0, h = 0;
-        const motes = Array.from({ length: 24 }, () => ({
+        const motes = Array.from({ length: 20 }, () => ({
           x: Math.random(),
           y: Math.random(),
-          r: 1.0 + Math.random() * 2.1,
+          r: 1.0 + Math.random() * 1.9,
           vx: (Math.random() - 0.35) * 0.00018,
-          vy: -(0.00012 + Math.random() * 0.00022),
+          vy: -(0.00012 + Math.random() * 0.0002),
           phase: Math.random() * Math.PI * 2,
-          speed: 0.008 + Math.random() * 0.014
+          speed: 0.008 + Math.random() * 0.013
         }));
 
         function resizeCanvas() {
           const dpr = Math.min(window.devicePixelRatio || 1, 2);
           w = canvas.clientWidth || 400;
-          h = canvas.clientHeight || 500;
+          h = canvas.clientHeight || 460;
           canvas.width = Math.round(w * dpr);
           canvas.height = Math.round(h * dpr);
           ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -929,7 +1514,7 @@
         function tick() {
           ctx.clearRect(0, 0, w, h);
           const playing = document.body.classList.contains('is-playing');
-          const boost = playing ? 1.55 : 0.75;
+          const boost = playing ? 1.5 : 0.75;
 
           for (const m of motes) {
             m.x += m.vx * boost;
@@ -940,17 +1525,17 @@
             if (m.x < -0.04) m.x = 1.04;
             if (m.x > 1.04) m.x = -0.04;
 
-            const alpha = (0.18 + 0.42 * (0.5 + 0.5 * Math.sin(m.phase))) * (playing ? 1 : 0.65);
+            const alpha = (0.16 + 0.38 * (0.5 + 0.5 * Math.sin(m.phase))) * (playing ? 1 : 0.65);
             const px = m.x * w;
             const py = m.y * h;
-            const grad = ctx.createRadialGradient(px, py, 0, px, py, m.r * 3.2);
+            const grad = ctx.createRadialGradient(px, py, 0, px, py, m.r * 3.1);
             grad.addColorStop(0, `rgba(255, 240, 206, ${alpha.toFixed(3)})`);
-            grad.addColorStop(0.5, `rgba(244, 198, 128, ${(alpha * 0.45).toFixed(3)})`);
+            grad.addColorStop(0.5, `rgba(244, 198, 128, ${(alpha * 0.42).toFixed(3)})`);
             grad.addColorStop(1, 'rgba(244, 198, 128, 0)');
 
             ctx.fillStyle = grad;
             ctx.beginPath();
-            ctx.arc(px, py, m.r * 3.2, 0, Math.PI * 2);
+            ctx.arc(px, py, m.r * 3.1, 0, Math.PI * 2);
             ctx.fill();
           }
           requestAnimationFrame(tick);

@@ -1,0 +1,5 @@
+# Ignore original raw jfif & local backup audio; deploy clean web assets only
+*.jfif
+*zpk.mp3
+!song-zpk.mp3
+song.mp3
