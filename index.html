@@ -933,7 +933,7 @@
   </div>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <audio id="audio" preload="metadata" playsinline></audio>
+  <audio id="audio" preload="auto" autoplay playsinline></audio>
 
   <script>
     /* ============================================================
@@ -943,7 +943,7 @@
       pageTitle: '明年依然好时节',
       songTitle: '明年依然好时节',
       songSubtitle: '翻唱给你听 · 愿你听时风轻云暖',
-      audioSrc: './song-zpk.mp3',
+      audioSrc: './song-zpk1126.mp3',
       slideIntervalMs: 3000,
       slides: [
         { src: './cover.jpg', label: '西瓜柯基', mode: 'cover' },
@@ -1329,7 +1329,7 @@
       }, { passive: false });
 
       /* ============================================================
-         3. 音频播放器（明年依然好时节_zpk.mp3）
+         3. 音频播放器（明年依然好时节_zpk1126.mp3 + 四重自动播放接力）
          ============================================================ */
       const audio = $('audio');
       const playBtn = $('playBtn');
@@ -1342,6 +1342,9 @@
       const totalTimeEl = $('totalTime');
 
       let isDraggingScrub = false;
+      let hasStartedOnce = false;
+      let userManuallyPaused = false;
+      let gestureBound = false;
 
       function formatTime(sec) {
         if (!Number.isFinite(sec) || sec < 0) return '00:00';
@@ -1362,6 +1365,57 @@
         document.body.classList.remove('is-loading');
       }
 
+      function unbindFirstGesture() {
+        if (!gestureBound) return;
+        gestureBound = false;
+        document.removeEventListener('touchstart', onFirstGesture, true);
+        document.removeEventListener('pointerdown', onFirstGesture, true);
+        document.removeEventListener('click', onFirstGesture, true);
+      }
+
+      function onFirstGesture(e) {
+        if (hasStartedOnce || userManuallyPaused) {
+          unbindFirstGesture();
+          return;
+        }
+        // 点到播放/重听按钮本身时交给按钮原生事件处理，避免重复触发
+        if (e.target && e.target.closest && (e.target.closest('#playBtn') || e.target.closest('#replayBtn'))) {
+          unbindFirstGesture();
+          return;
+        }
+        const p = audio.play();
+        if (p && typeof p.then === 'function') {
+          p.then(() => {
+            hasStartedOnce = true;
+            unbindFirstGesture();
+          }).catch(() => {
+            // 若该次事件未解锁（例如部分浏览器仅 click 解锁），继续保留监听等待下一次轻触
+          });
+        }
+      }
+
+      function bindFirstGesture() {
+        if (gestureBound || hasStartedOnce || userManuallyPaused) return;
+        gestureBound = true;
+        document.addEventListener('touchstart', onFirstGesture, { capture: true, passive: true });
+        document.addEventListener('pointerdown', onFirstGesture, { capture: true, passive: true });
+        document.addEventListener('click', onFirstGesture, { capture: true });
+      }
+
+      function tryAutoPlay() {
+        if (hasStartedOnce || userManuallyPaused || !audio.paused) return;
+        const p = audio.play();
+        if (p && typeof p.then === 'function') {
+          p.then(() => {
+            hasStartedOnce = true;
+            unbindFirstGesture();
+          }).catch(() => {
+            // 被手机浏览器（如 iOS Safari）自动播放策略拦截时，静默挂载首次触屏任意位置即播
+            bindFirstGesture();
+          });
+        }
+      }
+
       audio.src = LETTER_CONFIG.audioSrc;
 
       function syncDuration() {
@@ -1372,10 +1426,15 @@
 
       audio.addEventListener('loadedmetadata', syncDuration);
       audio.addEventListener('durationchange', syncDuration);
+      audio.addEventListener('canplay', () => tryAutoPlay(), { once: true });
       audio.addEventListener('waiting', () => {
         if (!audio.paused) document.body.classList.add('is-loading');
       });
-      audio.addEventListener('playing', () => setPlaying(true));
+      audio.addEventListener('playing', () => {
+        hasStartedOnce = true;
+        unbindFirstGesture();
+        setPlaying(true);
+      });
       audio.addEventListener('pause', () => setPlaying(false));
       audio.addEventListener('ended', () => {
         if (!audio.loop) setPlaying(false);
@@ -1393,16 +1452,31 @@
         }
       });
 
+      // 第 1 重：进入页面立刻尝试自动播放
+      tryAutoPlay();
+      // 第 2 重：微信内置浏览器自动解锁播放
+      document.addEventListener('WeixinJSBridgeReady', () => tryAutoPlay(), false);
+      if (window.WeixinJSBridge && typeof window.WeixinJSBridge.invoke === 'function') {
+        window.WeixinJSBridge.invoke('getNetworkType', {}, () => tryAutoPlay());
+      }
+      // 第 3 重：兜底挂载首次轻触/滑动页面任意位置即刻自动开播
+      bindFirstGesture();
+
       async function togglePlay() {
         if (audio.paused) {
+          userManuallyPaused = false;
           document.body.classList.add('is-loading');
           try {
             await audio.play();
+            hasStartedOnce = true;
+            unbindFirstGesture();
           } catch (err) {
             setPlaying(false);
             showToast('再轻点一下播放按钮试试');
           }
         } else {
+          userManuallyPaused = true;
+          unbindFirstGesture();
           audio.pause();
         }
       }
