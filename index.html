@@ -894,7 +894,7 @@
 
         <div class="player-extras">
           <button class="mini-action" id="replayBtn" type="button">重听</button>
-          <button class="mini-action" id="loopBtn" type="button" aria-pressed="false">单曲循环</button>
+          <button class="mini-action is-active" id="loopBtn" type="button" aria-pressed="true">单曲循环</button>
         </div>
       </div>
     </section>
@@ -1478,7 +1478,7 @@
       const songTitleEl = $('songTitle');
       const songSubtitleEl = $('songSubtitle');
 
-      let isLoopMode = false;
+      let isLoopMode = true;
       let consecutivePlays = 0;
       let isHiddenEggMode = false;
       let hasTrackedStart = false;
