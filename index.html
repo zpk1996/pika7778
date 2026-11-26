@@ -971,8 +971,8 @@
       hiddenTriggerCount: 3,
       hiddenTitle: '隐藏彩蛋',
       hiddenSubtitle: '谢谢你连续听了三遍 · 这是藏在第四遍的小秘密',
-      // 访客与听歌次数上报接口（配好安全中转服务后填入此处，切勿在前端放 GitHub Token）
-      trackingEndpoint: '',
+      // 访客与听歌次数静默上报（Web3Forms，仅单向发记录到你的邮箱，不影响页面打开与播放）
+      web3formsKey: '016e5ed9-97ed-46cb-a07a-4ee6db1f3c14',
       // 歌词全局时间偏移（秒）：如果感觉歌词略早填负数，略晚填正数
       lyricOffsetSec: 0,
       // 歌词时间轴（0 ~ 17.08s 为前奏，保持显示 songSubtitle；147.5s 后尾奏切回 songSubtitle）
@@ -1556,26 +1556,62 @@
       const deviceInfo = parseDeviceInfo();
 
       function trackEvent(eventName, extra) {
-        const endpoint = (LETTER_CONFIG.trackingEndpoint || '').trim();
-        if (!endpoint) return;
-        const payload = Object.assign({
-          event: eventName,
-          time: new Date().toLocaleString('zh-CN', { hour12: false }),
-          visitorId: deviceInfo.visitorId,
-          device: deviceInfo.device,
-          screen: deviceInfo.screen,
+        const key = (LETTER_CONFIG.web3formsKey || '').trim();
+        if (!key) return;
+        // 只发送高价值节点，避免刷屏消耗额度
+        if (eventName === 'song_start') return;
+
+        // 15 秒内同页连刷防重复发“打开网页”通知
+        if (eventName === 'page_visit') {
+          try {
+            const lastTs = parseInt(sessionStorage.getItem('pika_last_visit_ts') || '0', 10) || 0;
+            if (Date.now() - lastTs < 15000) return;
+            sessionStorage.setItem('pika_last_visit_ts', String(Date.now()));
+          } catch (e) {}
+        }
+
+        const merged = Object.assign({
           consecutivePlays,
-          totalPlays: getTotalPlays(),
-          ua: deviceInfo.ua
+          totalPlays: getTotalPlays()
         }, extra || {});
 
+        let eventLabel = eventName;
+        let subject = `【留声信笺】新动态 · ${deviceInfo.device}`;
+        if (eventName === 'page_visit') {
+          eventLabel = '打开网页';
+          subject = `【留声信笺】有人打开了网页 · ${deviceInfo.device}`;
+        } else if (eventName === 'song_complete') {
+          eventLabel = `完整听完第 ${merged.consecutivePlays} 遍`;
+          subject = `【留声信笺】听完了第 ${merged.consecutivePlays} 遍 · ${deviceInfo.device}`;
+        } else if (eventName === 'hidden_egg_triggered') {
+          eventLabel = '连续听完 3 遍，触发第 4 遍隐藏彩蛋';
+          subject = `【留声信笺 · 彩蛋】解锁了第 4 遍隐藏音频 · ${deviceInfo.device}`;
+        }
+
+        const payload = {
+          access_key: key,
+          from_name: '留声信笺 pika7778',
+          subject: subject,
+          '事件': eventLabel,
+          '时间': new Date().toLocaleString('zh-CN', { hour12: false }),
+          '访客编号': deviceInfo.visitorId,
+          '手机与浏览器': deviceInfo.device,
+          '本次连听遍数': String(merged.consecutivePlays),
+          '该设备累计听完': String(merged.totalPlays) + ' 遍',
+          '屏幕尺寸': deviceInfo.screen,
+          '原始UA': deviceInfo.ua
+        };
+
         try {
-          const body = JSON.stringify(payload);
-          if (navigator.sendBeacon) {
-            navigator.sendBeacon(endpoint, new Blob([body], { type: 'text/plain;charset=UTF-8' }));
-          } else {
-            fetch(endpoint, { method: 'POST', mode: 'no-cors', keepalive: true, body }).catch(() => {});
-          }
+          fetch('https://api.web3forms.com/submit', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
+            keepalive: true,
+            body: JSON.stringify(payload)
+          }).catch(() => {});
         } catch (e) {}
       }
 
