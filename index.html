@@ -406,11 +406,33 @@
     .song-sub {
       font-family: var(--sans);
       font-size: 12px;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.04em;
       color: var(--cream-sub);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      line-height: 1.45;
+      min-height: 18px;
+      transition: color 0.35s ease, opacity 0.28s ease;
+    }
+
+    .song-sub.is-lyric {
+      color: #F5D9AE;
+      font-family: var(--serif);
+      font-size: 12.5px;
+      letter-spacing: 0.05em;
+    }
+
+    .song-sub.is-egg {
+      color: #FFDCA6;
+    }
+
+    .song-sub.is-fading {
+      opacity: 0;
+    }
+
+    body.is-hidden-egg .player-section {
+      border-color: rgba(244, 210, 152, 0.42);
+      box-shadow:
+        0 18px 40px -12px rgba(212, 151, 82, 0.28),
+        inset 0 1px 0 rgba(255, 241, 220, 0.24);
     }
 
     .wave-bars {
@@ -944,6 +966,43 @@
       songTitle: '明年依然好时节',
       songSubtitle: '翻唱给你听 · 愿你听时风轻云暖',
       audioSrc: './song-zpk1126.mp3',
+      // 连续听满 3 遍后，第 4 遍自动切换播放的隐藏音频（录好后替换文件或改此处路径即可）
+      hiddenAudioSrc: './hidden-egg.wav',
+      hiddenTriggerCount: 3,
+      hiddenTitle: '隐藏彩蛋',
+      hiddenSubtitle: '谢谢你连续听了三遍 · 这是藏在第四遍的小秘密',
+      // 访客与听歌次数上报接口（配好安全中转服务后填入此处，切勿在前端放 GitHub Token）
+      trackingEndpoint: '',
+      // 歌词全局时间偏移（秒）：如果感觉歌词略早填负数，略晚填正数
+      lyricOffsetSec: 0,
+      // 歌词时间轴（0 ~ 17.08s 为前奏，保持显示 songSubtitle；147.5s 后尾奏切回 songSubtitle）
+      lyrics: [
+        { time: 17.08, text: '好久没有见到你' },
+        { time: 24.71, text: '我在猜想是因为 天在下雨' },
+        { time: 32.28, text: '我用水笔可以画出天上最美丽的星星' },
+        { time: 40.22, text: '却怎么也画不出 想你时的心情' },
+        { time: 47.86, text: '你的肩膀是我停留的理由' },
+        { time: 55.21, text: '靠在你的肩上我可以无限温柔' },
+        { time: 63.15, text: '飘摇的船虽然很浪漫却总是要靠岸' },
+        { time: 69.96, text: '我的期盼是否成为你的负担' },
+        { time: 78.21, text: '纵然我的相思有千千万万重' },
+        { time: 81.71, text: '你的心却轻似一阵风' },
+        { time: 85.59, text: '也许明年依然这时节' },
+        { time: 89.22, text: '我却早一去无影踪' },
+        { time: 93.28, text: '把爱放在手中却从未觉不同' },
+        { time: 96.97, text: '只在离别不忍道珍重' },
+        { time: 100.78, text: '也许明年依然这时节' },
+        { time: 104.47, text: '我却一去无影踪' },
+        { time: 112.47, text: '纵然我的相思有千千万万重' },
+        { time: 116.10, text: '你的心却轻似一阵风' },
+        { time: 119.85, text: '也许明年依然这时节' },
+        { time: 123.54, text: '我却早一去无影踪' },
+        { time: 127.41, text: '把爱放在手中却从未觉不同' },
+        { time: 131.17, text: '只在离别不忍道珍重' },
+        { time: 135.10, text: '也许明年依然这时节' },
+        { time: 138.79, text: '我却一去无影踪' },
+        { time: 147.50, text: '' }
+      ],
       slideIntervalMs: 3000,
       slides: [
         { src: './cover.jpg', label: '西瓜柯基', mode: 'cover' },
@@ -1416,6 +1475,191 @@
         }
       }
 
+      const songTitleEl = $('songTitle');
+      const songSubtitleEl = $('songSubtitle');
+
+      let isLoopMode = false;
+      let consecutivePlays = 0;
+      let isHiddenEggMode = false;
+      let hasTrackedStart = false;
+      let lastSubtitleText = LETTER_CONFIG.songSubtitle;
+      let lastSubtitleMode = 'default'; // 'default' | 'lyric' | 'egg'
+      let subtitleFadeTimer = null;
+
+      /* ---------- 访客设备识别与听歌统计采集 ---------- */
+      function getOrCreateVisitorId() {
+        try {
+          let id = localStorage.getItem('pika_visitor_id');
+          if (!id) {
+            id = '#' + Math.random().toString(36).slice(2, 6).toUpperCase();
+            localStorage.setItem('pika_visitor_id', id);
+          }
+          return id;
+        } catch (e) {
+          return '#ANON';
+        }
+      }
+
+      function getTotalPlays() {
+        try {
+          return parseInt(localStorage.getItem('pika_total_plays') || '0', 10) || 0;
+        } catch (e) {
+          return 0;
+        }
+      }
+
+      function incTotalPlays() {
+        const next = getTotalPlays() + 1;
+        try { localStorage.setItem('pika_total_plays', String(next)); } catch (e) {}
+        return next;
+      }
+
+      function parseDeviceInfo() {
+        const ua = navigator.userAgent || '';
+        let device = '未知设备';
+        if (/iPhone/i.test(ua)) {
+          const os = (ua.match(/iPhone OS (\d+[_\.]\d+)/i) || [])[1];
+          device = 'iPhone' + (os ? ' (iOS ' + os.replace(/_/g, '.') + ')' : '');
+        } else if (/iPad/i.test(ua)) {
+          device = 'iPad';
+        } else if (/Android/i.test(ua)) {
+          const m = ua.match(/Android\s+([\d.]+);\s*([^;)]+)/i);
+          if (m) {
+            const model = m[2].replace(/\s*Build\/.*$/i, '').trim();
+            device = `${model || 'Android'} (Android ${m[1]})`;
+          } else {
+            device = 'Android 手机';
+          }
+        } else if (/Macintosh/i.test(ua)) {
+          device = 'Mac';
+        } else if (/Windows/i.test(ua)) {
+          device = 'Windows PC';
+        }
+
+        let browser = '其他浏览器';
+        if (/MicroMessenger/i.test(ua)) browser = '微信';
+        else if (/QQ\//i.test(ua)) browser = 'QQ';
+        else if (/Weibo/i.test(ua)) browser = '微博';
+        else if (/Edg/i.test(ua)) browser = 'Edge';
+        else if (/Chrome/i.test(ua) && !/Edg/i.test(ua)) browser = 'Chrome';
+        else if (/Safari/i.test(ua)) browser = 'Safari';
+        else if (/Firefox/i.test(ua)) browser = 'Firefox';
+
+        return {
+          visitorId: getOrCreateVisitorId(),
+          device: `${device} · ${browser}`,
+          screen: `${window.screen.width}x${window.screen.height}`,
+          ua: ua.slice(0, 180)
+        };
+      }
+
+      const deviceInfo = parseDeviceInfo();
+
+      function trackEvent(eventName, extra) {
+        const endpoint = (LETTER_CONFIG.trackingEndpoint || '').trim();
+        if (!endpoint) return;
+        const payload = Object.assign({
+          event: eventName,
+          time: new Date().toLocaleString('zh-CN', { hour12: false }),
+          visitorId: deviceInfo.visitorId,
+          device: deviceInfo.device,
+          screen: deviceInfo.screen,
+          consecutivePlays,
+          totalPlays: getTotalPlays(),
+          ua: deviceInfo.ua
+        }, extra || {});
+
+        try {
+          const body = JSON.stringify(payload);
+          if (navigator.sendBeacon) {
+            navigator.sendBeacon(endpoint, new Blob([body], { type: 'text/plain;charset=UTF-8' }));
+          } else {
+            fetch(endpoint, { method: 'POST', mode: 'no-cors', keepalive: true, body }).catch(() => {});
+          }
+        } catch (e) {}
+      }
+
+      // 页面打开即记录访问
+      trackEvent('page_visit');
+
+      /* ---------- 同步歌词切换（前奏保持原副标题，开唱后逐句淡入） ---------- */
+      function setSubtitleDisplay(text, mode) {
+        if (text === lastSubtitleText && mode === lastSubtitleMode) return;
+        lastSubtitleText = text;
+        lastSubtitleMode = mode;
+
+        clearTimeout(subtitleFadeTimer);
+        songSubtitleEl.classList.add('is-fading');
+        subtitleFadeTimer = setTimeout(() => {
+          songSubtitleEl.textContent = text;
+          songSubtitleEl.classList.toggle('is-lyric', mode === 'lyric');
+          songSubtitleEl.classList.toggle('is-egg', mode === 'egg');
+          songSubtitleEl.classList.remove('is-fading');
+        }, 140);
+      }
+
+      function updateLyricByTime(sec) {
+        if (isHiddenEggMode) {
+          setSubtitleDisplay(LETTER_CONFIG.hiddenSubtitle, 'egg');
+          return;
+        }
+        const lyrics = LETTER_CONFIG.lyrics || [];
+        const t = sec + (LETTER_CONFIG.lyricOffsetSec || 0);
+        let activeLine = '';
+        for (let i = lyrics.length - 1; i >= 0; i--) {
+          if (t >= lyrics[i].time) {
+            activeLine = lyrics[i].text;
+            break;
+          }
+        }
+        if (activeLine) {
+          setSubtitleDisplay(activeLine, 'lyric');
+        } else {
+          setSubtitleDisplay(LETTER_CONFIG.songSubtitle, 'default');
+        }
+      }
+
+      /* ---------- 第 4 遍隐藏彩蛋音频切换 ---------- */
+      function enterHiddenEgg(autoPlayNow) {
+        isHiddenEggMode = true;
+        document.body.classList.add('is-hidden-egg');
+        songTitleEl.textContent = LETTER_CONFIG.hiddenTitle;
+        setSubtitleDisplay(LETTER_CONFIG.hiddenSubtitle, 'egg');
+        audio.src = LETTER_CONFIG.hiddenAudioSrc;
+        audio.currentTime = 0;
+        paintProgress(0);
+        currentTimeEl.textContent = '00:00';
+        totalTimeEl.textContent = '--:--';
+        audio.load();
+        trackEvent('hidden_egg_triggered');
+        showToast('解锁隐藏彩蛋 · 第 4 遍专属音频');
+
+        if (autoPlayNow) {
+          const p = audio.play();
+          if (p && typeof p.catch === 'function') {
+            p.catch(() => {
+              setPlaying(false);
+              showToast('彩蛋已就绪，点一下播放键收听');
+            });
+          }
+        }
+      }
+
+      function exitHiddenEggToMain() {
+        isHiddenEggMode = false;
+        consecutivePlays = 0;
+        document.body.classList.remove('is-hidden-egg');
+        songTitleEl.textContent = LETTER_CONFIG.songTitle;
+        setSubtitleDisplay(LETTER_CONFIG.songSubtitle, 'default');
+        audio.src = LETTER_CONFIG.audioSrc;
+        audio.currentTime = 0;
+        paintProgress(0);
+        currentTimeEl.textContent = '00:00';
+        totalTimeEl.textContent = '--:--';
+        audio.load();
+        setPlaying(false);
+      }
+
       audio.src = LETTER_CONFIG.audioSrc;
 
       function syncDuration() {
@@ -1434,10 +1678,40 @@
         hasStartedOnce = true;
         unbindFirstGesture();
         setPlaying(true);
+        if (!hasTrackedStart && !isHiddenEggMode) {
+          hasTrackedStart = true;
+          trackEvent('song_start');
+        }
       });
       audio.addEventListener('pause', () => setPlaying(false));
       audio.addEventListener('ended', () => {
-        if (!audio.loop) setPlaying(false);
+        if (isHiddenEggMode) {
+          // 隐藏彩蛋播完，温和恢复为主歌
+          exitHiddenEggToMain();
+          showToast('彩蛋听完啦，想听主歌可以随时再点播放');
+          return;
+        }
+
+        consecutivePlays += 1;
+        const total = incTotalPlays();
+        trackEvent('song_complete', { consecutivePlays, totalPlays: total });
+
+        // 连续听满 3 遍，第 4 遍自动切换播放隐藏音频
+        if (consecutivePlays >= (LETTER_CONFIG.hiddenTriggerCount || 3)) {
+          enterHiddenEgg(true);
+          return;
+        }
+
+        if (isLoopMode) {
+          audio.currentTime = 0;
+          paintProgress(0);
+          currentTimeEl.textContent = '00:00';
+          updateLyricByTime(0);
+          audio.play().catch(() => setPlaying(false));
+        } else {
+          setPlaying(false);
+          updateLyricByTime(0);
+        }
       });
       audio.addEventListener('error', () => {
         setPlaying(false);
@@ -1447,6 +1721,7 @@
       audio.addEventListener('timeupdate', () => {
         if (isDraggingScrub) return;
         currentTimeEl.textContent = formatTime(audio.currentTime);
+        updateLyricByTime(audio.currentTime);
         if (Number.isFinite(audio.duration) && audio.duration > 0) {
           paintProgress(audio.currentTime / audio.duration);
         }
@@ -1484,9 +1759,11 @@
       playBtn.addEventListener('click', togglePlay);
 
       replayBtn.addEventListener('click', async () => {
+        userManuallyPaused = false;
         audio.currentTime = 0;
         paintProgress(0);
         currentTimeEl.textContent = '00:00';
+        updateLyricByTime(0);
         document.body.classList.add('is-loading');
         try {
           await audio.play();
@@ -1497,10 +1774,10 @@
       });
 
       loopBtn.addEventListener('click', () => {
-        audio.loop = !audio.loop;
-        loopBtn.classList.toggle('is-active', audio.loop);
-        loopBtn.setAttribute('aria-pressed', String(audio.loop));
-        showToast(audio.loop ? '已开启单曲循环' : '已关闭单曲循环');
+        isLoopMode = !isLoopMode;
+        loopBtn.classList.toggle('is-active', isLoopMode);
+        loopBtn.setAttribute('aria-pressed', String(isLoopMode));
+        showToast(isLoopMode ? '已开启单曲循环' : '已关闭单曲循环');
       });
 
       function ratioFromX(clientX) {
@@ -1515,6 +1792,7 @@
         if (Number.isFinite(audio.duration) && audio.duration > 0) {
           const t = r * audio.duration;
           currentTimeEl.textContent = formatTime(t);
+          updateLyricByTime(t);
           if (commit) audio.currentTime = t;
         }
       }
